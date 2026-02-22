@@ -129,6 +129,17 @@ export function registerGameHandlers(
     }
   });
 
+  // GM sends a hint to all players
+  socket.on('game:send-hint', ({ text }) => {
+    const roomId = socket.data.roomId as string;
+    const room = getRoom(roomId);
+    if (!room || room.gameMasterId !== socket.id) return;
+    if (room.gameState !== 'answering') return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    io.to(roomId).emit('game:hint', { text: trimmed });
+  });
+
   // GM proceeds to next round
   socket.on('game:next-round', () => {
     const roomId = socket.data.roomId as string;

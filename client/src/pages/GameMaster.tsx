@@ -21,6 +21,7 @@ function GameMaster() {
   const [promptCount, setPromptCount] = useState(0);
   const [roundNumber, setRoundNumber] = useState(0);
   const [result, setResult] = useState<RoundResult | null>(null);
+  const [hintText, setHintText] = useState('');
 
   useEffect(() => {
     if (!socket.connected) { navigate('/'); return; }
@@ -84,6 +85,14 @@ function GameMaster() {
     setPhase('input');
     setPrompts(['', '', '']);
     setResult(null);
+    setHintText('');
+  };
+
+  const sendHint = () => {
+    const trimmed = hintText.trim();
+    if (!trimmed) return;
+    socket.emit('game:send-hint', { text: trimmed });
+    setHintText('');
   };
 
   const resetGame = () => {
@@ -210,6 +219,24 @@ function GameMaster() {
         <p className="text-center mt-10" style={{ color: 'rgba(255,255,255,0.5)' }}>
           プレイヤーが {promptCount}個のキーワードを推測中...
         </p>
+      </div>
+
+      <div className="card">
+        <h3 className="mb-10">ヒントを送る</h3>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="input"
+            type="text"
+            placeholder="ヒントを入力..."
+            value={hintText}
+            onChange={(e) => setHintText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && sendHint()}
+            style={{ flex: 1 }}
+          />
+          <button className="btn btn-secondary" onClick={sendHint} disabled={!hintText.trim()}>
+            送信
+          </button>
+        </div>
       </div>
     </div>
   );

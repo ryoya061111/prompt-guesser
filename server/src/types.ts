@@ -42,6 +42,7 @@ export interface ServerToClientEvents {
   'game:round-result': (data: RoundResult) => void;
   'game:finished': (data: { winner: PlayerData; scores: PlayerData[] }) => void;
   'game:next-round': () => void;
+  'game:hint': (data: { text: string }) => void;
   'error': (data: { message: string }) => void;
 }
 
@@ -56,6 +57,7 @@ export interface ClientToServerEvents {
   'room:update-settings': (data: { settings: GameSettings }) => void;
   'game:set-prompts': (data: { prompts: string[] }) => void;
   'game:submit-answer': (data: { answer: string }) => void;
+  'game:send-hint': (data: { text: string }) => void;
   'game:next-round': () => void;
   'game:reset': () => void;
 }

@@ -30,6 +30,7 @@ function Player() {
   const [allClearKey, setAllClearKey] = useState<number | null>(null);
   const flashActiveRef = useRef(false);
   const [claimedWords, setClaimedWords] = useState<ClaimedWord[]>([]);
+  const [hints, setHints] = useState<string[]>([]);
   const [result, setResult] = useState<RoundResult | null>(null);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ function Player() {
       setWrongFeedback(null);
       setCorrectFlashKey(null);
       setClaimedWords([]);
+      setHints([]);
       setResult(null);
     });
 
@@ -68,6 +70,10 @@ function Player() {
 
     socket.on('game:answer-correct', (data: any) => {
       setClaimedWords(prev => [...prev, { word: '???', playerName: data.playerName }]);
+    });
+
+    socket.on('game:hint', (data: any) => {
+      setHints(prev => [...prev, data.text]);
     });
 
     socket.on('game:round-result', (data: RoundResult) => {
@@ -120,6 +126,7 @@ function Player() {
       socket.off('game:time-update');
       socket.off('game:answer-feedback');
       socket.off('game:answer-correct');
+      socket.off('game:hint');
       socket.off('game:round-result');
       socket.off('game:next-round');
       socket.off('room:updated');
@@ -238,6 +245,20 @@ function Player() {
                     border: '1px solid rgba(78,205,196,0.25)',
                   }}>
                     {cw.playerName} が正解
+                  </span>
+                ))}
+              </div>
+            )}
+            {hints.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ヒント</div>
+                {hints.map((h, i) => (
+                  <span key={i} style={{
+                    padding: '7px 12px', borderRadius: 8, fontSize: '0.9rem',
+                    background: 'rgba(255,215,0,0.1)', color: 'var(--gold)',
+                    border: '1px solid rgba(255,215,0,0.25)',
+                  }}>
+                    {h}
                   </span>
                 ))}
               </div>
