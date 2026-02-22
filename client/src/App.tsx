@@ -9,7 +9,7 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app">
-        <h1 className="app-title">Prompt Guess</h1>
+        <h1 className="app-title">Prompt Guesser</h1>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/lobby/:roomId" element={<Lobby />} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { socket } from '../socket';
 import ScoreBoard from '../components/ScoreBoard';
@@ -25,7 +25,10 @@ function Player() {
   const [promptCount, setPromptCount] = useState(0);
   const [roundNumber, setRoundNumber] = useState(0);
   const [answer, setAnswer] = useState('');
-  const [feedback, setFeedback] = useState<{ message: string; type: 'correct' | 'wrong' | 'claimed' } | null>(null);
+  const [wrongFeedback, setWrongFeedback] = useState<string | null>(null);
+  const [correctFlashKey, setCorrectFlashKey] = useState<number | null>(null);
+  const [allClearKey, setAllClearKey] = useState<number | null>(null);
+  const flashActiveRef = useRef(false);
   const [claimedWords, setClaimedWords] = useState<ClaimedWord[]>([]);
   const [result, setResult] = useState<RoundResult | null>(null);
 
@@ -39,7 +42,8 @@ function Player() {
       setRemaining(data.timeLimit);
       setRoundNumber(data.roundNumber);
       setAnswer('');
-      setFeedback(null);
+      setWrongFeedback(null);
+      setCorrectFlashKey(null);
       setClaimedWords([]);
       setResult(null);
     });
@@ -48,25 +52,45 @@ function Player() {
 
     socket.on('game:answer-feedback', (data: any) => {
       if (data.correct && !data.alreadyClaimed) {
-        setFeedback({ message: data.message, type: 'correct' });
         setAnswer('');
-      } else if (data.correct && data.alreadyClaimed) {
-        setFeedback({ message: data.message, type: 'claimed' });
+        const key = Date.now();
+        flashActiveRef.current = true;
+        setCorrectFlashKey(key);
+        setTimeout(() => {
+          flashActiveRef.current = false;
+          setCorrectFlashKey(null);
+        }, 2000);
       } else {
-        setFeedback({ message: data.message, type: 'wrong' });
+        setWrongFeedback(data.alreadyClaimed ? 'already' : 'wrong');
+        setTimeout(() => setWrongFeedback(null), 1200);
       }
-      // Clear feedback after 2s
-      setTimeout(() => setFeedback(null), 2000);
     });
 
     socket.on('game:answer-correct', (data: any) => {
       setClaimedWords(prev => [...prev, { word: '???', playerName: data.playerName }]);
-      // Update claimed count from broadcast
     });
 
     socket.on('game:round-result', (data: RoundResult) => {
-      setPhase(data.isGameOver ? 'finished' : 'result');
-      setResult(data);
+      const allClaimed = data.claimedBy.every(c => c.playerName !== null);
+
+      const applyResult = () => {
+        setAllClearKey(null);
+        flashActiveRef.current = false;
+        setCorrectFlashKey(null);
+        setPhase(data.isGameOver ? 'finished' : 'result');
+        setResult(data);
+      };
+
+      if (allClaimed) {
+        // 全問正解アナウンスを3秒表示してから結果へ
+        setAllClearKey(Date.now());
+        flashActiveRef.current = true;
+        setTimeout(applyResult, 3200);
+      } else if (flashActiveRef.current) {
+        setTimeout(applyResult, 2100);
+      } else {
+        applyResult();
+      }
     });
 
     socket.on('game:next-round', () => {
@@ -132,10 +156,7 @@ function Player() {
                 border: '1px solid',
                 borderColor: c.playerName ? 'rgba(78,205,196,0.2)' : 'rgba(255,100,100,0.15)',
               }}>
-                <span style={{
-                  fontWeight: 700,
-                  color: c.playerName ? 'var(--teal)' : '#ff6b6b',
-                }}>{c.prompt}</span>
+                <span style={{ fontWeight: 700, color: c.playerName ? 'var(--teal)' : '#ff6b6b' }}>{c.prompt}</span>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                   {c.playerName ?? '誰も回答できず'}
                 </span>
@@ -177,10 +198,30 @@ function Player() {
 
         {/* 画像 + 正解状況を横並び */}
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          {currentImage && (
-            <img src={currentImage} alt="AI generated" className="game-image"
-              style={{ flex: '0 0 auto', width: '58%', margin: 0 }} />
-          )}
+          {/* 画像エリア（エフェクトオーバーレイ付き） */}
+          <div style={{ position: 'relative', flex: '0 0 auto', width: '75%' }}>
+            {currentImage && (
+              <img src={currentImage} alt="AI generated" className="game-image" style={{ margin: 0 }} />
+            )}
+            {correctFlashKey !== null && !allClearKey && (
+              <div key={correctFlashKey} className="correct-flash-overlay">
+                <div className="correct-flash-ring" />
+                <div className="correct-flash-check">✓</div>
+                <div className="correct-flash-label">正解！</div>
+              </div>
+            )}
+            {allClearKey !== null && (
+              <div key={allClearKey} className="all-clear-overlay">
+                <div className="all-clear-ring" />
+                <div className="all-clear-ring all-clear-ring-2" />
+                <div className="all-clear-emoji">🎊</div>
+                <div className="all-clear-title">全問クリア！</div>
+                <div className="all-clear-sub">すべてのキーワードが正解されました</div>
+              </div>
+            )}
+          </div>
+
+          {/* 右パネル */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.5)' }}>
               <span style={{ color: 'var(--teal)', fontWeight: 800, fontSize: '1.6rem' }}>{claimedCount}</span>
@@ -207,25 +248,9 @@ function Player() {
 
       <div className="card">
         <h3 className="mb-10">キーワードを入力</h3>
-
-        {feedback && (
-          <div style={{
-            padding: '12px 18px', borderRadius: 8, marginBottom: 14,
-            background: feedback.type === 'correct' ? 'rgba(78,205,196,0.15)'
-              : feedback.type === 'claimed' ? 'rgba(255,165,0,0.15)'
-              : 'rgba(255,100,100,0.15)',
-            color: feedback.type === 'correct' ? 'var(--teal)'
-              : feedback.type === 'claimed' ? '#ffaa00'
-              : '#ff6b6b',
-            fontWeight: 600, fontSize: '1rem',
-          }}>
-            {feedback.message}
-          </div>
-        )}
-
         <div style={{ display: 'flex', gap: 8 }}>
           <input
-            className="input"
+            className={`input ${wrongFeedback === 'wrong' ? 'input-shake input-wrong' : wrongFeedback === 'already' ? 'input-shake input-claimed' : ''}`}
             type="text"
             placeholder="キーワードを推測"
             value={answer}
