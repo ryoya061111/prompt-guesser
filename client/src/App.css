@@ -364,6 +364,61 @@ body {
   100% { opacity: 0; }
 }
 
+/* ──── Time Up Overlay ──── */
+.time-up-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(233, 69, 96, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 11;
+  animation: timeUpFade 2.4s ease-out forwards;
+}
+
+.time-up-emoji {
+  font-size: 3.5rem;
+  line-height: 1;
+  animation: checkPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.time-up-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--accent-light);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 24px rgba(233, 69, 96, 0.9), 0 2px 8px rgba(0,0,0,0.5);
+  animation: labelSlideUp 0.4s ease-out 0.1s both;
+}
+
+@keyframes timeUpFade {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ──── Timer Bar ──── */
+.timer-bar-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.timer-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s linear, background-color 0.5s ease;
+}
+
 /* ──── Input Shake (wrong answer) ──── */
 .input-shake {
   animation: inputShake 0.4s ease-out;

@@ -22,12 +22,14 @@ function Player() {
   const [phase, setPhase] = useState<'waiting' | 'answering' | 'result' | 'finished'>('waiting');
   const [currentImage, setCurrentImage] = useState('');
   const [remaining, setRemaining] = useState(0);
+  const [timeLimit, setTimeLimit] = useState(60);
   const [promptCount, setPromptCount] = useState(0);
   const [roundNumber, setRoundNumber] = useState(0);
   const [answer, setAnswer] = useState('');
   const [wrongFeedback, setWrongFeedback] = useState<string | null>(null);
   const [correctFlashKey, setCorrectFlashKey] = useState<number | null>(null);
   const [allClearKey, setAllClearKey] = useState<number | null>(null);
+  const [timeUpKey, setTimeUpKey] = useState<number | null>(null);
   const flashActiveRef = useRef(false);
   const [claimedWords, setClaimedWords] = useState<ClaimedWord[]>([]);
   const [hints, setHints] = useState<string[]>([]);
@@ -41,16 +43,27 @@ function Player() {
       setCurrentImage(data.imageData);
       setPromptCount(data.promptCount);
       setRemaining(data.timeLimit);
+      setTimeLimit(data.timeLimit);
       setRoundNumber(data.roundNumber);
       setAnswer('');
       setWrongFeedback(null);
       setCorrectFlashKey(null);
+      setAllClearKey(null);
+      setTimeUpKey(null);
       setClaimedWords([]);
       setHints([]);
       setResult(null);
+      flashActiveRef.current = false;
     });
 
     socket.on('game:time-update', (data: any) => setRemaining(data.remaining));
+
+    socket.on('game:time-up', () => {
+      setTimeUpKey(Date.now());
+      // Clear any active correct flash
+      setCorrectFlashKey(null);
+      flashActiveRef.current = false;
+    });
 
     socket.on('game:answer-feedback', (data: any) => {
       if (data.correct && !data.alreadyClaimed) {
@@ -81,6 +94,7 @@ function Player() {
 
       const applyResult = () => {
         setAllClearKey(null);
+        setTimeUpKey(null);
         flashActiveRef.current = false;
         setCorrectFlashKey(null);
         setPhase(data.isGameOver ? 'finished' : 'result');
@@ -103,6 +117,7 @@ function Player() {
       setPhase('waiting');
       setResult(null);
       setClaimedWords([]);
+      setTimeUpKey(null);
     });
 
     socket.on('room:updated', (data: any) => {
@@ -117,6 +132,7 @@ function Player() {
         setCurrentImage(response.gameImage.imageData);
         setPromptCount(response.gameImage.promptCount);
         setRemaining(response.gameImage.timeLimit);
+        setTimeLimit(response.gameImage.timeLimit);
         setRoundNumber(response.gameImage.roundNumber);
       }
     });
@@ -124,6 +140,7 @@ function Player() {
     return () => {
       socket.off('game:show-image');
       socket.off('game:time-update');
+      socket.off('game:time-up');
       socket.off('game:answer-feedback');
       socket.off('game:answer-correct');
       socket.off('game:hint');
@@ -194,23 +211,34 @@ function Player() {
 
   // Answering phase
   const claimedCount = claimedWords.length;
+  const barPct = Math.max(0, remaining / timeLimit) * 100;
+  const barColor = remaining > timeLimit * 0.5
+    ? 'var(--teal)'
+    : remaining > timeLimit * 0.25
+      ? 'var(--gold)'
+      : 'var(--accent)';
 
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        {/* ヘッダー：ラウンド番号 + タイマー */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>ラウンド {roundNumber}</h3>
           <div className={`timer ${remaining <= 10 ? 'warning' : ''}`}>{remaining}s</div>
         </div>
+        {/* タイマーバー */}
+        <div className="timer-bar-track">
+          <div className="timer-bar-fill" style={{ width: `${barPct}%`, backgroundColor: barColor }} />
+        </div>
 
         {/* 画像 + 正解状況を横並び */}
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', marginTop: 14 }}>
           {/* 画像エリア（エフェクトオーバーレイ付き） */}
           <div style={{ position: 'relative', flex: '0 0 auto', width: '75%' }}>
             {currentImage && (
               <img src={currentImage} alt="AI generated" className="game-image" style={{ margin: 0 }} />
             )}
-            {correctFlashKey !== null && !allClearKey && (
+            {correctFlashKey !== null && !allClearKey && !timeUpKey && (
               <div key={correctFlashKey} className="correct-flash-overlay">
                 <div className="correct-flash-ring" />
                 <div className="correct-flash-check">✓</div>
@@ -224,6 +252,12 @@ function Player() {
                 <div className="all-clear-emoji">🎊</div>
                 <div className="all-clear-title">全問クリア！</div>
                 <div className="all-clear-sub">すべてのキーワードが正解されました</div>
+              </div>
+            )}
+            {timeUpKey !== null && (
+              <div key={timeUpKey} className="time-up-overlay">
+                <div className="time-up-emoji">⏰</div>
+                <div className="time-up-title">時間切れ！</div>
               </div>
             )}
           </div>
@@ -278,9 +312,10 @@ function Player() {
             onChange={(e) => setAnswer(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
             autoFocus
+            disabled={timeUpKey !== null}
             style={{ flex: 1 }}
           />
-          <button className="btn btn-primary" onClick={submitAnswer} disabled={!answer.trim()}>
+          <button className="btn btn-primary" onClick={submitAnswer} disabled={!answer.trim() || timeUpKey !== null}>
             回答
           </button>
         </div>

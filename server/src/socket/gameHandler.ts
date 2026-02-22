@@ -31,6 +31,7 @@ export function registerGameHandlers(
         imageData,
         claimedPrompts: new Map(),
       };
+      (room as any)._roundEnded = false;
 
       room.gameState = 'answering';
       io.to(roomId).emit('game:show-image', {
@@ -46,7 +47,11 @@ export function registerGameHandlers(
         io.to(roomId).emit('game:time-update', { remaining });
         if (remaining <= 0) {
           clearInterval(timer);
-          endRound(io, room);
+          (room as any)._timer = null;
+          // Block new answers during transition
+          room.gameState = 'result';
+          io.to(roomId).emit('game:time-up');
+          setTimeout(() => endRound(io, room), 2500);
         }
       }, 1000);
       (room as any)._timer = timer;
@@ -168,6 +173,9 @@ export function registerGameHandlers(
 }
 
 function endRound(io: Server<ClientToServerEvents, ServerToClientEvents>, room: Room) {
+  if ((room as any)._roundEnded) return;
+  (room as any)._roundEnded = true;
+
   if ((room as any)._timer) {
     clearInterval((room as any)._timer);
     (room as any)._timer = null;

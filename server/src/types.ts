@@ -42,6 +42,7 @@ export interface ServerToClientEvents {
   'game:round-result': (data: RoundResult) => void;
   'game:finished': (data: { winner: PlayerData; scores: PlayerData[] }) => void;
   'game:next-round': () => void;
+  'game:time-up': () => void;
   'game:hint': (data: { text: string }) => void;
   'error': (data: { message: string }) => void;
 }

@@ -18,10 +18,12 @@ function GameMaster() {
   const [phase, setPhase] = useState<'input' | 'generating' | 'playing' | 'result' | 'finished'>('input');
   const [currentImage, setCurrentImage] = useState('');
   const [remaining, setRemaining] = useState(0);
+  const [timeLimit, setTimeLimit] = useState(60);
   const [promptCount, setPromptCount] = useState(0);
   const [roundNumber, setRoundNumber] = useState(0);
   const [result, setResult] = useState<RoundResult | null>(null);
   const [hintText, setHintText] = useState('');
+  const [timeUpKey, setTimeUpKey] = useState<number | null>(null);
 
   useEffect(() => {
     if (!socket.connected) { navigate('/'); return; }
@@ -31,12 +33,19 @@ function GameMaster() {
       setCurrentImage(data.imageData);
       setPromptCount(data.promptCount);
       setRemaining(data.timeLimit);
+      setTimeLimit(data.timeLimit);
       setRoundNumber(data.roundNumber);
+      setTimeUpKey(null);
     });
 
     socket.on('game:time-update', (data: any) => setRemaining(data.remaining));
 
+    socket.on('game:time-up', () => {
+      setTimeUpKey(Date.now());
+    });
+
     socket.on('game:round-result', (data: RoundResult) => {
+      setTimeUpKey(null);
       setPhase(data.isGameOver ? 'finished' : 'result');
       setResult(data);
     });
@@ -52,6 +61,7 @@ function GameMaster() {
         setCurrentImage(response.gameImage.imageData);
         setPromptCount(response.gameImage.promptCount);
         setRemaining(response.gameImage.timeLimit);
+        setTimeLimit(response.gameImage.timeLimit);
         setRoundNumber(response.gameImage.roundNumber);
       }
     });
@@ -59,6 +69,7 @@ function GameMaster() {
     return () => {
       socket.off('game:show-image');
       socket.off('game:time-update');
+      socket.off('game:time-up');
       socket.off('game:round-result');
       socket.off('error');
     };
@@ -86,6 +97,7 @@ function GameMaster() {
     setPrompts(['', '', '']);
     setResult(null);
     setHintText('');
+    setTimeUpKey(null);
   };
 
   const sendHint = () => {
@@ -208,6 +220,13 @@ function GameMaster() {
   }
 
   // Playing phase
+  const barPct = Math.max(0, remaining / timeLimit) * 100;
+  const barColor = remaining > timeLimit * 0.5
+    ? 'var(--teal)'
+    : remaining > timeLimit * 0.25
+      ? 'var(--gold)'
+      : 'var(--accent)';
+
   return (
     <div>
       <div className="card">
@@ -215,7 +234,20 @@ function GameMaster() {
           <h3>ラウンド {roundNumber}</h3>
           <div className={`timer ${remaining <= 10 ? 'warning' : ''}`}>{remaining}s</div>
         </div>
-        {currentImage && <img src={currentImage} alt="AI generated" className="game-image" />}
+        {/* タイマーバー */}
+        <div className="timer-bar-track">
+          <div className="timer-bar-fill" style={{ width: `${barPct}%`, backgroundColor: barColor }} />
+        </div>
+        {/* 画像エリア（時間切れオーバーレイ付き） */}
+        <div style={{ position: 'relative', marginTop: 14 }}>
+          {currentImage && <img src={currentImage} alt="AI generated" className="game-image" style={{ margin: 0 }} />}
+          {timeUpKey !== null && (
+            <div key={timeUpKey} className="time-up-overlay">
+              <div className="time-up-emoji">⏰</div>
+              <div className="time-up-title">時間切れ！</div>
+            </div>
+          )}
+        </div>
         <p className="text-center mt-10" style={{ color: 'rgba(255,255,255,0.5)' }}>
           プレイヤーが {promptCount}個のキーワードを推測中...
         </p>
@@ -231,9 +263,10 @@ function GameMaster() {
             value={hintText}
             onChange={(e) => setHintText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendHint()}
+            disabled={timeUpKey !== null}
             style={{ flex: 1 }}
           />
-          <button className="btn btn-secondary" onClick={sendHint} disabled={!hintText.trim()}>
+          <button className="btn btn-secondary" onClick={sendHint} disabled={!hintText.trim() || timeUpKey !== null}>
             送信
           </button>
         </div>
