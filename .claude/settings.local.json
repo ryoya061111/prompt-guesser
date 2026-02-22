@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:codenames.game)",
+      "Bash(powershell -c \"irm https://astral.sh/uv/install.ps1 | iex\")",
+      "Bash(powershell -ExecutionPolicy Bypass -c \"irm https://astral.sh/uv/install.ps1 | iex\")",
+      "Bash(export PATH=\"/c/Users/ryoya/.local/bin:$PATH\")",
+      "Bash(uv:*)",
+      "Bash(claude mcp add-json:*)",
+      "Bash(where:*)",
+      "Bash(powershell -c \"Get-Command claude -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(powershell -c:*)"
+    ]
+  }
+}
